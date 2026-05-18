@@ -90,4 +90,11 @@ driver.quit()
 pd.set_option('display.max_rows', None)
 
 df = pd.DataFrame(all_data)
+
+df.to_csv(
+    "../data/products.csv",
+    index=False,
+    encoding="utf-8-sig"
+)
+
 print(df)
