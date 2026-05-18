@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+
+# Virtual environment
+venv/
+.env
+.env.local
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
+
+# Django
+staticfiles/
+media/
+
+# Streamlit
+.streamlit/
+
+# Test / cache
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Build files
+dist/
+build/
