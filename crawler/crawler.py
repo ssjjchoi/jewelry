@@ -27,7 +27,9 @@ urls = [
     "https://www.vancleefarpels.com/kr/ko/collections/jewelry/alhambra.html",
     "https://www.vancleefarpels.com/kr/ko/collections/jewelry/perlee.html",
     "https://www.vancleefarpels.com/kr/ko/collections/jewelry/fauna.html",
-    "https://www.vancleefarpels.com/kr/ko/collections/jewelry/flora/frivole.html"
+    "https://www.vancleefarpels.com/kr/ko/collections/jewelry/flora/frivole.html",
+    "https://www.vancleefarpels.com/kr/ko/collections/jewelry/other-collections/zodiaque.html",
+    "https://www.vancleefarpels.com/kr/ko/collections/jewelry/flora.html"
 ]
 
 all_data = []
@@ -42,6 +44,7 @@ for url in urls:
 
     time.sleep(2)
 
+    # infinite scroll
     last_height = driver.execute_script("return document.body.scrollHeight")
 
     while True:
@@ -55,9 +58,42 @@ for url in urls:
 
         last_height = new_height
 
+    # Load More
+    while True:
+        try:
+            span = WebDriverWait(driver, 3).until(
+                EC.presence_of_element_located(
+                    (By.ID, "loadMore-aria-label")
+                )
+            )
+
+            button = span.find_element(By.XPATH, "./ancestor::button")
+
+            driver.execute_script(
+                "arguments[0].scrollIntoView(true);",
+                button
+            )
+
+            time.sleep(1)
+
+            driver.execute_script(
+                "arguments[0].click();",
+                button
+            )
+
+            print(f"[LOAD MORE] {url}")
+
+            time.sleep(3)
+
+        except:
+            print(f"[DONE] {url}")
+            break
+
     collection_name = url.split("/")[-1].replace(".html", "")
 
     products = driver.find_elements(By.CLASS_NAME, "product-tile")
+
+    print(f"{collection_name}: {len(products)} products")
 
     for p in products:
         raw = p.get_attribute("data-vue-stats-product")
@@ -65,14 +101,21 @@ for url in urls:
         if raw:
             data = json.loads(raw)
 
-            name = data.get("item_name")
+            name = data.get("item_name", "").strip()
 
-            price_raw = float(data.get("price"))
-            price = f"₩ {price_raw:,.0f}"
+            price_value = data.get("price")
 
-            # 중복방지
+            # price 예외 처리
+            try:
+                price_raw = float(price_value)
+                price = f"₩ {price_raw:,.0f}"
+            except:
+                price_raw = None
+                price = "N/A"
+
+            # 중복 방지
             item_id = data.get("item_id")
-            key = item_id if item_id else (name + str(price_raw))
+            key = item_id if item_id else (name + str(price))
 
             if key in seen:
                 continue
@@ -84,6 +127,10 @@ for url in urls:
                 "name": name,
                 "price": price
             })
+
+#디버깅
+print(f"RAW tiles: {len(products)}")
+print(f"UNIQUE items: {len(all_data)}")            
 
 driver.quit()
 
