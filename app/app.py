@@ -38,14 +38,22 @@ st.info(
     f"contains the most products."
 )
 
-
 # 가격 숫자 변환
 df["price_num"] = (
     df["price"]
     .str.replace("₩", "")
     .str.replace(",", "")
-    .astype(int)
+    .str.strip()
 )
+
+df["price_num"] = pd.to_numeric(
+    df["price_num"],
+    errors="coerce"
+)
+
+df = df.dropna(subset=["price_num"])
+
+df["price_num"] = df["price_num"].astype(int)
 
 
 # 가격 통계1
