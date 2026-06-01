@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import streamlit as st
+from sqlalchemy import create_engine
 
 
 #st.title("Jewelry Dashboard")
@@ -18,10 +19,14 @@ st.markdown(
 )
 st.caption("Luxury Jewelry Price Visualization ✨")
            
-BASE_DIR = Path(__file__).resolve().parent.parent
-csv_path = BASE_DIR / "data" / "products.csv"
+engine = create_engine(
+    "postgresql+psycopg2://sjchoi@localhost/jewelry"
+)
 
-df = pd.read_csv(csv_path)
+df = pd.read_sql(
+    "SELECT * FROM products",
+    engine
+)
 
 st.metric("▸ Total Products", len(df))
 

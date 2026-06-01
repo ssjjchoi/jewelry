@@ -9,8 +9,9 @@ Jewelry Price Crawler
 2. Access pages with Selenium
 3. Extract product-tile elements
 4. Parse embedded JSON data
-5. Store data using pandas
-6. Visualize data with Streamlit
+5. Transform data with pandas
+6. Save data to CSV and PostgreSQL
+7. Visualize data with Streamlit
 """
 
 import json
@@ -20,6 +21,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from sqlalchemy import create_engine
 
 driver = webdriver.Chrome()
 
@@ -130,7 +132,7 @@ for url in urls:
 
 #디버깅
 print(f"RAW tiles: {len(products)}")
-print(f"UNIQUE items: {len(all_data)}")            
+print(f"UNIQUE items: {len(all_data)}")          
 
 driver.quit()
 
@@ -144,4 +146,16 @@ df.to_csv(
     encoding="utf-8-sig"
 )
 
-print(df)
+engine = create_engine(
+    "postgresql+psycopg2://sjchoi@localhost/jewelry"
+)
+
+df.to_sql(
+    "products",
+    engine,
+    if_exists="replace",
+    index=False
+)
+
+print("products table save!")
+print(f"Total products: {len(df)}")
