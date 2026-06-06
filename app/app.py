@@ -28,6 +28,42 @@ df = pd.read_sql(
     engine
 )
 
+
+df = pd.read_sql(
+    "SELECT * FROM products",
+    engine
+)
+
+
+# Product Search
+# ==========================
+st.subheader("🔍 Search")
+
+keyword = st.text_input(
+    "Enter product name"
+)
+
+if keyword:
+    search_df = df[
+        df["name"].str.contains(
+            keyword,
+            case=False,
+            na=False
+        )
+    ]
+
+    st.write(
+        f"Search Result : {len(search_df)} items"
+    )
+
+    st.dataframe(search_df)
+else:
+    st.info(
+        "product name please."
+    )
+# ==========================
+
+
 st.metric("▸ Total Products", len(df))
 
 
