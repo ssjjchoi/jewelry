@@ -2,9 +2,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 from sqlalchemy import create_engine
+import os
 
-
-#st.title("Jewelry Dashboard")
 st.markdown(
     """
     <h1 style='
@@ -17,31 +16,42 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-st.caption("Luxury Jewelry Price Visualization ✨")
-           
-engine = create_engine(
-    "postgresql+psycopg2://sjchoi@localhost/jewelry"
-)
 
-df = pd.read_sql(
-    "SELECT * FROM products",
-    engine
-)
+st.caption("Luxury Jewelry Price Visualization")
 
 
-df = pd.read_sql(
-    "SELECT * FROM products",
-    engine
-)
+DB_URL = os.getenv("DB_URL", "postgresql+psycopg2://sjchoi@localhost/jewelry")
+
+engine = create_engine(DB_URL)
 
 
-# Product Search
-# ==========================
-st.subheader("🔍 Search")
+# DATA LOAD (CACHE)
+@st.cache_data
+def load_data():
+    return pd.read_sql("SELECT * FROM products", engine)
 
-keyword = st.text_input(
-    "Enter product name"
-)
+
+# PREPROCESS
+def preprocess(df):
+    df = df.copy()
+
+    df["price_num"] = (
+        df["price"]
+        .str.replace(r"[^\d]", "", regex=True)
+    )
+
+    df["price_num"] = pd.to_numeric(df["price_num"], errors="coerce")
+    df = df.dropna(subset=["price_num"])
+    df["price_num"] = df["price_num"].astype(int)
+
+    return df
+
+df = load_data()
+df = preprocess(df)
+
+
+# SEARCH
+keyword = st.text_input("🔍 Enter product name")
 
 if keyword:
     search_df = df[
@@ -52,77 +62,39 @@ if keyword:
         )
     ]
 
-    st.write(
-        f"Search Result : {len(search_df)} items"
-    )
-
+    st.write(f"Search Result : {len(search_df)} items")
     st.dataframe(search_df)
-else:
-    st.info(
-        "product name please."
-    )
-# ==========================
 
 
+# BASIC METRIC
 st.metric("▸ Total Products", len(df))
 
 
-# 컬렉션별 개수
+# COLLECTION COUNT
 st.subheader("💠 Products by Collection")
 
 collection_count = df["collection"].value_counts()
 
 st.bar_chart(collection_count)
 
-st.info(
-    f"» The {collection_count.idxmax()} collection "
-    f"contains the most products."
-)
-
-# 가격 숫자 변환
-df["price_num"] = (
-    df["price"]
-    .str.replace("₩", "")
-    .str.replace(",", "")
-    .str.strip()
-)
-
-df["price_num"] = pd.to_numeric(
-    df["price_num"],
-    errors="coerce"
-)
-
-df = df.dropna(subset=["price_num"])
-
-df["price_num"] = df["price_num"].astype(int)
+if not collection_count.empty:
+    st.info(f"» The {collection_count.idxmax()} collection contains the most products.")
 
 
-# 가격 통계1
+# PRICE STATS
 st.subheader("💠 Price Statistics")
 
-col1, col2, col3 = st.columns(3)
+if len(df) > 0:
+    col1, col2, col3 = st.columns(3)
 
-col1.metric(
-    "Average Price",
-    f"₩ {df['price_num'].mean():,.0f}"
-)
+    col1.metric("Average Price", f"₩ {df['price_num'].mean():,.0f}")
+    col2.metric("Minimum Price", f"₩ {df['price_num'].min():,.0f}")
+    col3.metric("Maximum Price", f"₩ {df['price_num'].max():,.0f}")
 
-col2.metric(
-    "Minimum Price",
-    f"₩ {df['price_num'].min():,.0f}"
-)
-
-col3.metric(
-    "Maximum Price",
-    f"₩ {df['price_num'].max():,.0f}"
-)
-
-st.info(
-    "» Compare average, minimum, and maximum prices across luxury jewelry products."
-)
+    st.info("» Compare average, minimum, and maximum prices across products.")
 
 
-# 가격 통계2
+# GROUP STATS
 st.subheader("💠 Collection Price Statistics")
 
 stats_df = (
@@ -131,112 +103,88 @@ stats_df = (
     .reset_index()
 )
 
-stats_df.columns = [
-    "Collection",
-    "Average Price",
-    "Minimum Price",
-    "Maximum Price"
-]
+stats_df.columns = ["Collection", "Average Price", "Minimum Price", "Maximum Price"]
 
-
-# 원화 포맷
-stats_df["Average Price"] = stats_df["Average Price"].apply(
-    lambda x: f"₩ {x:,.0f}"
-)
-
-stats_df["Minimum Price"] = stats_df["Minimum Price"].apply(
-    lambda x: f"₩ {x:,.0f}"
-)
-
-stats_df["Maximum Price"] = stats_df["Maximum Price"].apply(
-    lambda x: f"₩ {x:,.0f}"
-)
+for col in ["Average Price", "Minimum Price", "Maximum Price"]:
+    stats_df[col] = stats_df[col].apply(lambda x: f"₩ {x:,.0f}")
 
 st.dataframe(stats_df)
 
 
-# 가격 분포도
+# DISTRIBUTION
 st.subheader("💠 Price Distribution")
 
-max_price = df["price_num"].max()
+if len(df) > 0:
+    max_price = df["price_num"].max()
 
-bins = [
-    0,
-    1_000_000,
-    3_000_000,
-    5_000_000,
-    10_000_000,
-    20_000_000,
-]
+    bins = [0, 1_000_000, 3_000_000, 5_000_000, 10_000_000, 20_000_000]
 
-# 최고가가 2천만원보다 크면 마지막 bin 추가
-if max_price > 20_000_000:
-    bins.append(max_price)
+    if max_price > 20_000_000:
+        bins.append(max_price)
 
-labels = [
-    "100만 원 이하",
-    "100만 원 ~ 300만 원",
-    "300만 원 ~ 500만 원",
-    "500만 원 ~ 1,000만 원",
-    "1,000만 원 ~ 2,000만 원",
-]
+    labels = [
+        "100만 원 이하",
+        "100만 원 ~ 300만 원",
+        "300만 원 ~ 500만 원",
+        "500만 원 ~ 1,000만 원",
+        "1,000만 원 ~ 2,000만 원",
+    ]
 
-# 마지막 구간 라벨 추가
-if max_price > 20_000_000:
-    labels.append("2,000만 원 이상")
+    if max_price > 20_000_000:
+        labels.append("2,000만 원 이상")
 
-df["price_range"] = pd.cut(
-    df["price_num"],
-    bins=bins,
-    labels=labels,
-    include_lowest=True
-)
+    df["price_range"] = pd.cut(df["price_num"], bins=bins, labels=labels, include_lowest=True)
 
-price_dist = (
-    df["price_range"]
-    .value_counts()
-    .sort_index()
-)
+    price_dist = df["price_range"].value_counts().sort_index()
 
-st.bar_chart(price_dist)
+    st.bar_chart(price_dist)
 
-dist_df = price_dist.reset_index()
-dist_df.columns = ["Price Range", "Product Count"]
+    dist_df = price_dist.reset_index()
+    dist_df.columns = ["Price Range", "Product Count"]
 
-st.dataframe(dist_df)
+    st.dataframe(dist_df)
 
 
-# TOP 10 expensive jewelry
+# TOP 10
 st.subheader("💠 Top 10 Most Expensive Jewelry")
 
-top10 = df.sort_values(
-    "price_num",
-    ascending=False
-).head(10)
+top10 = df.sort_values("price_num", ascending=False).head(10)
 
-st.dataframe(
-    top10[["collection", "name", "price"]]
-)
+st.dataframe(top10[["collection", "name", "price"]])
 
 
-# 컬렉션 선택 필터
-selected = st.selectbox(
-    "▸ Select Collection",
-    df["collection"].unique()
-)
+# FILTER
+st.subheader("🔎 Filter Products")
+
+selected = st.selectbox("▸ Select Collection", df["collection"].dropna().unique())
 
 filtered = df[df["collection"] == selected]
 
-st.subheader(f"💠 {selected} Products")
-st.dataframe(filtered)
+if len(filtered) > 0:
+    min_price = int(filtered["price_num"].min())
+    max_price = int(filtered["price_num"].max())
+
+    price_range = st.slider(
+        "💰 Select Price Range",
+        min_value=min_price,
+        max_value=max_price,
+        value=(min_price, max_price)
+    )
+
+    filtered = filtered[
+        (filtered["price_num"] >= price_range[0]) &
+        (filtered["price_num"] <= price_range[1])
+    ]
+
+    st.write(f"Showing {len(filtered)} products")
+    st.dataframe(filtered)
 
 
-# 데이터 확인
+# RAW DATA
 st.subheader("📁 Raw Data")
+
 with st.expander("View Raw Data"):
     st.dataframe(df)
 
-
-#
 st.markdown("---")
 st.caption("Developed by @ssjjchoi")
