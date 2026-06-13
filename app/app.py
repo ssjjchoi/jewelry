@@ -19,17 +19,14 @@ st.markdown(
 
 st.caption("Luxury Jewelry Price Visualization")
 
-
 DB_URL = os.getenv("DB_URL", "postgresql+psycopg2://sjchoi@localhost/jewelry")
 
 engine = create_engine(DB_URL)
-
 
 # DATA LOAD (CACHE)
 @st.cache_data
 def load_data():
     return pd.read_sql("SELECT * FROM products", engine)
-
 
 # PREPROCESS
 def preprocess(df):
@@ -49,9 +46,45 @@ def preprocess(df):
 df = load_data()
 df = preprocess(df)
 
+# FILTER
+st.subheader("🔎 Filter Products")
 
+#selected = st.selectbox("▸ Select Collection", df["collection"].dropna().unique())
+selected = st.sidebar.selectbox(
+    "▸ Select Collection",
+    df["collection"].dropna().unique()
+)
+
+filtered = df[df["collection"] == selected]
+
+if len(filtered) > 0:
+    min_price = int(filtered["price_num"].min())
+    max_price = int(filtered["price_num"].max())
+
+    # price_range = st.slider(
+    #     "💰 Select Price Range",
+    #     min_value=min_price,
+    #     max_value=max_price,
+    #     value=(min_price, max_price)
+    # )
+    price_range = st.sidebar.slider(
+        "💰 Select Price Range",
+        min_value=min_price,
+        max_value=max_price,
+        value=(min_price, max_price)
+    )    
+
+    filtered = filtered[
+        (filtered["price_num"] >= price_range[0]) &
+        (filtered["price_num"] <= price_range[1])
+    ]
+
+    st.write(f"Showing {len(filtered)} products")
+    st.dataframe(filtered)
+    
 # SEARCH
-keyword = st.text_input("🔍 Enter product name")
+#keyword = st.text_input("🔍 Enter product name")
+keyword = st.sidebar.text_input("🔍 Enter product name")
 
 if keyword:
     search_df = df[
@@ -66,21 +99,6 @@ if keyword:
     st.dataframe(search_df)
 
 
-# BASIC METRIC
-st.metric("▸ Total Products", len(df))
-
-
-# COLLECTION COUNT
-st.subheader("💠 Products by Collection")
-
-collection_count = df["collection"].value_counts()
-
-st.bar_chart(collection_count)
-
-if not collection_count.empty:
-    st.info(f"» The {collection_count.idxmax()} collection contains the most products.")
-
-
 # PRICE STATS
 st.subheader("💠 Price Statistics")
 
@@ -93,6 +111,18 @@ if len(df) > 0:
 
     st.info("» Compare average, minimum, and maximum prices across products.")
 
+# BASIC METRIC
+#st.metric("▸ Total Products", len(df))
+
+# COLLECTION COUNT
+st.subheader("💠 Products by Collection")
+
+collection_count = df["collection"].value_counts()
+
+st.bar_chart(collection_count)
+
+if not collection_count.empty:
+    st.info(f"» The {collection_count.idxmax()} collection contains the most products.")
 
 # GROUP STATS
 st.subheader("💠 Collection Price Statistics")
@@ -109,7 +139,6 @@ for col in ["Average Price", "Minimum Price", "Maximum Price"]:
     stats_df[col] = stats_df[col].apply(lambda x: f"₩ {x:,.0f}")
 
 st.dataframe(stats_df)
-
 
 # DISTRIBUTION
 st.subheader("💠 Price Distribution")
@@ -144,7 +173,6 @@ if len(df) > 0:
 
     st.dataframe(dist_df)
 
-
 # TOP 10
 st.subheader("💠 Top 10 Most Expensive Jewelry")
 
@@ -152,37 +180,7 @@ top10 = df.sort_values("price_num", ascending=False).head(10)
 
 st.dataframe(top10[["collection", "name", "price"]])
 
-
-# FILTER
-st.subheader("🔎 Filter Products")
-
-selected = st.selectbox("▸ Select Collection", df["collection"].dropna().unique())
-
-filtered = df[df["collection"] == selected]
-
-if len(filtered) > 0:
-    min_price = int(filtered["price_num"].min())
-    max_price = int(filtered["price_num"].max())
-
-    price_range = st.slider(
-        "💰 Select Price Range",
-        min_value=min_price,
-        max_value=max_price,
-        value=(min_price, max_price)
-    )
-
-    filtered = filtered[
-        (filtered["price_num"] >= price_range[0]) &
-        (filtered["price_num"] <= price_range[1])
-    ]
-
-    st.write(f"Showing {len(filtered)} products")
-    st.dataframe(filtered)
-
-
 # RAW DATA
-st.subheader("📁 Raw Data")
-
 with st.expander("View Raw Data"):
     st.dataframe(df)
 
