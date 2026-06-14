@@ -1,18 +1,21 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from pydantic import BaseModel
 import pandas as pd
 from sqlalchemy import create_engine
+import os
 
 class SearchResponse(BaseModel):
     count: int
     items: list
 
-
 app = FastAPI()
 
-engine = create_engine(
-    "postgresql+psycopg2://sjchoi@localhost/jewelry"
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg2://localhost/jewelry"
 )
+
+engine = create_engine(DATABASE_URL)
 
 @app.get("/")
 def root():
@@ -31,14 +34,24 @@ def search(
     min_price: int = 0,
     max_price: int = 999999999,
     sort: str = "price_asc",
-    limit: int = 20,
-    offset: int = 0
+    limit: int = Query(
+    default=20,
+    ge=1,
+    le=100
+    ),
+
+    offset: int = Query(
+        default=0,
+        ge=0
+    )
 ):
 
-    order_by = "price ASC"
+    SORT_OPTIONS = {
+        "price_asc": "price ASC",
+        "price_desc": "price DESC"
+    }
 
-    if sort == "price_desc":
-        order_by = "price DESC"
+    order_by = SORT_OPTIONS.get(sort, "price ASC")
 
     query = f"""
     SELECT *
@@ -86,14 +99,21 @@ def collections():
 
 @app.get("/stats")
 def stats():
-    df = pd.read_sql(
-        "SELECT * FROM products",
-        engine
-    )
+
+    query = """
+    SELECT
+        COUNT(*) AS total_products,
+        COUNT(DISTINCT collection) AS collections,
+        AVG(price_num) AS avg_price,
+        MAX(price_num) AS max_price
+    FROM products
+    """
+
+    df = pd.read_sql(query, engine)
 
     return {
-        "total_products": len(df),
-        "collections": df["collection"].nunique(),
-        "avg_price": int(df["price_num"].mean()),
-        "max_price": int(df["price_num"].max())
+        "total_products": int(df.iloc[0]["total_products"]),
+        "collections": int(df.iloc[0]["collections"]),
+        "avg_price": int(df.iloc[0]["avg_price"]),
+        "max_price": int(df.iloc[0]["max_price"])
     }
