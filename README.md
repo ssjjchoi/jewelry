@@ -55,8 +55,8 @@ streamlit run app/app.py
 
 ## API Preview
 
-![API](assets/api.png)
+<img src="assets/api.png" width="300">
 
 ## Dashboard Preview
 
-![Dashboard](assets/dashboard.png)
+<img src="assets/dashboard.png" width="300">
